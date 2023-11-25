@@ -16,6 +16,7 @@
 
 - Edit the `includes/config.php` to your preference
 - Upload all files inside `src` to the root of your webserver
+- Change `api_endpoint` in `examples/sleuth.py` pointing to your server
 ---
 
 ### 🔥 Features
@@ -32,9 +33,11 @@
 ### 📜 ChangeLog
 
 ```diff
-v0.0.1 ⋮ 15/3/2022
+v0.0.1 ⋮ 09/04/2022
 ! Initial release
 
+v0.0.2 ⋮ 25/11/2023
+! Added example
 ```
 
 ---
