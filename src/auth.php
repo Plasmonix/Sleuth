@@ -23,21 +23,15 @@ function checkLicenseStatus($license)
             WHERE l.license = :license
             LIMIT 1";
 
-    $statement = $pdo->prepare($query);
-    $statement->bindParam(':license', $license);
-    $statement->execute();
-
-    $result = $statement->fetch($pdo::FETCH_ASSOC);
+    $result = executeQuery($query, [':license' => $license])->fetch($pdo::FETCH_ASSOC);
 
     if (!$result) {
         return json_encode(["status" => "error", "message" => "License not found"]);
     }
 
     if ($result['claimed'] && isset($_POST['hwid']) && $result['hwid'] != $_POST['hwid']) {
-        if ($result['status'] == "banned") {
-            return json_encode(["status" => "error", "message" => "License is associated with a banned user"]);
-        }
-        return json_encode(["status" => "error", "message" => "License is not eligible for registration"]);
+        $errorMessage = ($result['status'] == "banned") ? "License is associated with a banned user" : "License is not eligible for registration";
+        return json_encode(["status" => "error", "message" => $errorMessage]);
     }
 
     $expiryDate = new DateTime($result['expiry']);
@@ -48,7 +42,6 @@ function checkLicenseStatus($license)
     }
 
     return json_encode(["status" => "success", "data" => $result]);
-
 }
 
 function registerUser($userData)
@@ -67,23 +60,17 @@ function registerUser($userData)
         return json_encode(["status" => "error", "message" => "License is already in use"]);
     }
 
-    $queryInsertUser = "INSERT INTO users (name, role, ip, hwid) VALUES (:name, :role, :ip, :hwid)";
-    $statementInsertUser = $pdo->prepare($queryInsertUser);
-    $statementInsertUser->bindParam(':name', $name);
-    $statementInsertUser->bindParam(':role', $role);
-    $statementInsertUser->bindParam(':ip', $ip);
-    $statementInsertUser->bindParam(':hwid', $hwid);
-    $statementInsertUser->execute();
+    $userId = executeQuery("INSERT INTO users (name, role, ip, hwid) VALUES (:name, :role, :ip, :hwid)", [
+        ':name' => $name,
+        ':role' => $role,
+        ':ip' => $ip,
+        ':hwid' => $hwid
+    ])->lastInsertId();
 
-    $userId = $pdo->lastInsertId();
-    $queryUpdateLicense = "UPDATE licenses SET ID = $userId, claimed = 1 WHERE license = :license";
-    $statementUpdateLicense = $pdo->prepare($queryUpdateLicense);
-    $statementUpdateLicense->bindParam(':license', $license);
-    $statementUpdateLicense->execute();
+    executeQuery("UPDATE licenses SET ID = $userId, claimed = 1 WHERE license = :license", [':license' => $license]);
 
     return json_encode(["status" => "success", "message" => "User registered successfully"]);
 }
-
 
 function getUserInfo($license)
 {
@@ -93,17 +80,21 @@ function getUserInfo($license)
               INNER JOIN licenses l ON u.ID = l.ID
               WHERE l.license = :license";
 
-    $statement = $pdo->prepare($query);
-    $statement->bindParam(':license', $license);
-    $statement->execute();
-
-    $result = $statement->fetch($pdo::FETCH_ASSOC);
+    $result = executeQuery($query, [':license' => $license])->fetch($pdo::FETCH_ASSOC);
 
     if ($result) {
         return json_encode(["status" => "success", "data" => $result]);
     } else {
         return json_encode(["status" => "error", "message" => "User not found"]);
     }
+}
+
+function executeQuery($query, $params = [])
+{
+    global $pdo;
+    $statement = $pdo->prepare($query);
+    $statement->execute($params);
+    return $statement;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['license']) && isset($_POST['action'])) {
